@@ -27,9 +27,12 @@ function woocommerce_gateway_ceca_init() {
         require_once dirname(__FILE__) . '/includes/class-ceca-deprecated.php';
     }
     if ( class_exists( 'WC_Subscriptions_Order' ) && class_exists( 'WC_Payment_Gateway_CC' ) ) {
-        require_once dirname( __FILE__ ) . '/includes/class-wc-subscriptions.php';
+        require_once dirname( __FILE__ ) . '/includes/class-ceca-subscriptions.php';
+        if( class_exists('WC_Payment_Token_CC') ){
+            require_once dirname( __FILE__ ) . '/includes/class-ceca-token.php';
+        }
     }
-    
+
     add_filter('woocommerce_payment_gateways', 'woocommerce_add_gateway_ceca' );
 }
 add_action('plugins_loaded', 'woocommerce_gateway_ceca_init', 0);

@@ -90,7 +90,7 @@ class WC_Gateway_Ceca extends WC_Payment_Gateway_CC {
         }
 
         // search for this order and store the $ref
-        $order = new WC_Order($order_id);
+        $order = new wc_get_order($order_id);
         if ( $order ) {
             update_post_meta( $order->id, 'REF', wc_clean( $posted['Referencia'] ) );
         }
@@ -220,16 +220,17 @@ class WC_Gateway_Ceca extends WC_Payment_Gateway_CC {
         $result['MerchantID']       = $this->merchand_id;
         $result['AcquirerBIN']      = $this->acquirer_bin;
         $result['TerminalID']       = $this->terminal_id;
-        $result['URL_OK']           = $this->get_return_url( $order );
-        $result['URL_NOK']          = get_permalink( woocommerce_get_page_id( 'checkout' ) );
-        $result['Firma']            = $this->calculate_sign( $order );
-        $result['Cifrado']          = 'SHA1';
         $result['Num_operacion']    = $order->id;
         $result['Importe']          = $order->get_total()*100;
         $result['TipoMoneda']       = $this->currency;
         $result['Exponente']        = '2';
+        $result['URL_OK']           = $this->get_return_url( $order );
+        $result['URL_NOK']          = get_permalink( woocommerce_get_page_id( 'checkout' ) );
+        $result['Idioma']           = $this->language;
+        $result['Cifrado']          = 'SHA1';
+        $result['Firma']            = $this->calculate_sign( $order );
         $result['Pago_soportado']   = 'SSL';
-        $result['idioma']           = $this->language;
+
 
         return $result;
     }
@@ -243,7 +244,7 @@ class WC_Gateway_Ceca extends WC_Payment_Gateway_CC {
      */
     function generate_ceca_form( $order_id ) {
 
-        $order = new WC_Order( $order_id );
+        $order = new wc_get_order( $order_id );
 
         $ceca_args = $this->get_ceca_args( $order );
 
@@ -275,14 +276,58 @@ class WC_Gateway_Ceca extends WC_Payment_Gateway_CC {
     function process_payment( $order_id ) {
         global $woocommerce;
 
-        $order = new WC_Order( $order_id );
+        if ( isset( $_POST['wc-ceca-payment-token'] ) && 'new' !== $_POST['wc-ceca-payment-token'] ) {
+            $token_id = wc_clean( $_POST['wc-ceca-payment-token'] );
+            $token    = WC_Payment_Tokens::get( $token_id );
 
-        return array(
-            'result'    => 'success',
-            'redirect'  => $order->get_checkout_payment_url( true )
-        );
+            if ( $token->get_user_id() !== get_current_user_id() ) {
+
+                wc_add_notice( 'CECA Invalid token ID', 'error' );
+
+                return;
+
+            } else {
+                $this->process_token_payment( $token, $order_id );
+
+                $order = wc_get_order( $order_id );
+
+                return array(
+                    'result'   => 'success',
+                    'redirect' => $this->get_return_url( $order )
+                );
+            }
+        } else {
+
+            if ( is_user_logged_in() && isset( $_POST['wc-ceca-new-payment-method'] ) && true === (bool) $_POST['wc-ceca-new-payment-method'] ) {
+
+                update_post_meta( $order_id, '_wc_ceca_save_card', true );
+
+
+            }
+
+            $order = new wc_get_order( $order_id );
+
+            return array(
+                'result'    => 'success',
+                'redirect'  => $order->get_checkout_payment_url( true )
+            );
+        }
 
     }
 
+    /**
+     * Process a token payment
+     */
+    public function process_token_payment( $token, $order_id ) {
 
+        if ( $token && $order_id ) {
+
+            if($this->debug){
+                $url_tpv = $this->ceca_url_debug;
+            }else{
+                $url_tpv = $this->ceca_url_production;
+            }
+
+        }
+    }
 }
